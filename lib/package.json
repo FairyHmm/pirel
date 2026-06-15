@@ -1,0 +1,10 @@
+{
+  "name": "pirell",
+  "author": "Fairy",
+  "version": "0.1.0",
+  "description": "Lightweight pipeline-based relational utilities for native JS arrays.",
+  "main": "index.js",
+  "type": "module",
+  "keywords": ["pipe", "relational", "fluent", "array-utils"],
+  "license": "MIT"
+}
