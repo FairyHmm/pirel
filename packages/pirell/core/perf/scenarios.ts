@@ -30,18 +30,21 @@ function directChain(data: string, links: string[]): string {
 }
 
 function wrapChain(i: number, data: string, links: string[]): string {
+  // Chain .extend({link}).link() fluently off the previous *surface*,
+  // never through a fresh pirell(prev.value) re-wrap: pirell(x) infers a
+  // shape via bare-literal ShapeOf<T>, which doesn't reconstruct a prior
+  // op's declared Out (e.g. toEntries' ["i","i..."]) — re-wrapping loses
+  // exactly the shape info the next link's Fluent check needs, and
+  // surfaces as a bogus ShapeMismatch even on links that chain validly
+  // (confirmed: direct/pipe forms of the same link lists compile clean).
+  // Fluent<F,S> already checks In against the pre-extend surface's own
+  // CurrentShp, so staying on the surface is both correct and cheaper.
   const lines: string[] = [];
-  let cur = data;
-  let wrap = true;
+  let cur = `pirell(${data})`;
   links.forEach((l, k) => {
     const v = k === links.length - 1 ? `s${i}` : `s${i}_${k}`;
-    lines.push(
-      wrap
-        ? `const ${v} = pirell(${cur}).extend({ ${l} }).${l}();`
-        : `const ${v} = pirell(${cur}.value).extend({ ${l} }).${l}();`,
-    );
+    lines.push(`const ${v} = ${cur}.extend({ ${l} }).${l}();`);
     cur = v;
-    wrap = false;
   });
   return lines.join("\n");
 }

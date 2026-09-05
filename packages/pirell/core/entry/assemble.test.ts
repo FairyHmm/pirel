@@ -4,6 +4,7 @@ import {
   double,
   sumAll,
   toEntries,
+  entriesToObject,
   sumValues,
   flattenEntries,
   stringifyValues,
@@ -19,16 +20,14 @@ describe("Deferred.value typing", () => {
 
 describe("Wrapper.extend (data-bound)", () => {
   it("wires a fluent method and returns a surface holding the raw result", () => {
-    const ext = (pirell([1, 2, 3]) as any).extend({ double });
+    const ext = pirell([1, 2, 3]).extend({ double });
     const result = ext.double();
 
     expect(result.value).toEqual([2, 4, 6]);
   });
 
   it("works with object shape [Keyed, ...]", () => {
-    const result = (pirell({ a: 1, b: 2 }) as any)
-      .extend({ toEntries })
-      .toEntries();
+    const result = pirell({ a: 1, b: 2 }).extend({ toEntries }).toEntries();
 
     expect(result.value).toEqual([
       ["a", 1],
@@ -37,7 +36,7 @@ describe("Wrapper.extend (data-bound)", () => {
   });
 
   it("works with nested shape [Keyed, Indexed, ...]", () => {
-    const result = (pirell({ a: [1, 2], b: [3, 4] }) as any)
+    const result = pirell({ a: [1, 2], b: [3, 4] })
       .extend({ sumValues })
       .sumValues();
 
@@ -45,12 +44,103 @@ describe("Wrapper.extend (data-bound)", () => {
   });
 
   it("chains extends on successive results", () => {
-    const entries = (pirell({ a: 1, b: 2 }) as any)
-      .extend({ toEntries })
-      .toEntries();
+    const entries = pirell({ a: 1, b: 2 }).extend({ toEntries }).toEntries();
     const result = entries.extend({ flattenEntries }).flattenEntries();
 
     expect(result.value).toEqual([1, 2]);
+  });
+});
+
+describe("Wrapper.extend always wires; the mismatch surfaces at the call, not registration", () => {
+  it(".extend() accepts a mismatched op without complaint", () => {
+    // Compile-time only: must type-check clean, no @ts-expect-error.
+    if (false) {
+      const wired = pirell([1, 2, 3]).extend({ toEntries });
+      void wired;
+    }
+  });
+
+  it("calling the mismatched method is what fails to type-check", () => {
+    if (false) {
+      // @ts-expect-error -- toEntries expects ["k"], pirell([1,2,3]) is ["i"]
+      pirell([1, 2, 3]).extend({ toEntries }).toEntries();
+    }
+  });
+
+  it("fails to type-check even as a bare unused binding — the check fires on the call, not on how the result is used", () => {
+    // Regression guard: Fluent used to type mismatches via a function's
+    // RETURN type (() => ShapeMismatch<...>). A plain `const result = ...`
+    // with no chained call, no .value access, and no type annotation
+    // never constrains that return type, so tsc had no reason to object —
+    // the whole rejection was invisible on exactly this, very common,
+    // style of use. Fixed by moving the conditional outside the call
+    // signature: on mismatch the member isn't a function at all, so the
+    // call expression itself is rejected (TS2349), independent of what
+    // happens to the result.
+    if (false) {
+      // @ts-expect-error -- toEntries expects ["k"], pirell([1,2,3]) is ["i"]
+      const result = pirell([1, 2, 3]).extend({ toEntries }).toEntries();
+      void result;
+    }
+  });
+});
+
+// See PLAN.md "relocate .extend()'s shape check onto Fluent/call-site"
+// for the overload-collision bug these tests guard against.
+describe("Wrapper.extend with multiple ops registered together", () => {
+  it("calling the op that fits the CURRENT shape succeeds", () => {
+    const data: [string, number][] = [
+      ["a", 1],
+      ["b", 2],
+    ];
+    const twoOp = pirell(data).extend({ entriesToObject, toEntries });
+    const result = twoOp.entriesToObject();
+
+    expect(result.value).toEqual({ a: 1, b: 2 });
+  });
+
+  it("the fitting op's result is NOT a union across the registered ops' Outs", () => {
+    const twoOp = pirell([1, 2, 3]).extend({ double, toEntries });
+    const result = twoOp.double();
+    // double's own Out ([["i", number]]), not toEntries' — and not a
+    // union of the two. Sibling ops registered in the same .extend() call
+    // stay wired (re-checked fresh against the narrowed shape) rather
+    // than vanishing from the type, matching what's actually still
+    // callable at runtime (builders.ts threads `ops` through unchanged).
+    expect(result.value).toEqual([2, 4, 6]);
+    expectTypeOf(result.double).not.toBeNever();
+  });
+
+  it("calling the second op before the first has run (wrong order) fails to type-check", () => {
+    if (false) {
+      const data = [
+        ["a", 1],
+        ["b", 2],
+      ];
+      const twoOp = pirell(data).extend({ entriesToObject, toEntries });
+      // @ts-expect-error -- toEntries wants ["k"]; twoOp's shape is still ["i","i..."]
+      twoOp.toEntries();
+    }
+  });
+
+  it("calling in the correct order chains through cleanly", () => {
+    const data = [
+      ["a", 1],
+      ["b", 2],
+    ];
+    const twoOp = pirell(data).extend({ entriesToObject, toEntries });
+    // toEntries was registered alongside entriesToObject in the same
+    // .extend() call, so it's already wired on the narrowed result —
+    // no need to re-.extend() it. See the runtime-vs-type bug this fixed:
+    // Fluent<F,S> used to drop every sibling method on success, even
+    // though builders.ts's buildSurface always threads the full `ops`
+    // map forward unchanged.
+    const result = twoOp.entriesToObject().toEntries();
+
+    expect(result.value).toEqual([
+      ["a", 1],
+      ["b", 2],
+    ]);
   });
 });
 
@@ -71,9 +161,7 @@ describe("Wrapper.pipe (data-bound)", () => {
 });
 
 // Bound has no .compose(): it already holds data, so there's no deferred
-// state to compose into — it would just be pipe() under a name that
-// promises the opposite of what pipe() does everywhere else in the
-// package (see assemble.ts's Assembled<S> comment).
+// state to compose into — see assemble.ts's Assembled<S> comment.
 describe("Wrapper.compose (data-bound): intentionally absent", () => {
   it("is not present on a Bound surface", () => {
     const wrapper = pirell([1, 2, 3]) as any;
@@ -81,7 +169,6 @@ describe("Wrapper.compose (data-bound): intentionally absent", () => {
   });
 
   it("rejects at the type level too", () => {
-    // Type check only — never runs.
     if (false) {
       // @ts-expect-error -- compose() only exists on Deferred, not Bound
       pirell([1, 2, 3]).compose(double, sumAll);

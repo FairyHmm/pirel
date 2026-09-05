@@ -83,10 +83,8 @@ export type Op<
   Args extends unknown[] = [],
 > = (...args: Args) => (data: DataOf<In>) => Raw<Out>;
 
-// Not `this`-typed: closes over the op at attach time, then narrows on each
-// .extend() so the pre-call shape no longer matches.
-export type Fluent<F extends Op<any, any, any>> =
-  F extends Op<any, infer Out, any> ? () => Bound<Out> : never;
+// Fluent<F,S> lives in types/fluent.ts — see PLAN.md "relocate .extend()'s
+// shape check onto Fluent/call-site".
 
 // Type-level tag for a data-bound surface. Forward-declared here to avoid
 // a circular dependency; named Bound (not Wrapper) so it doesn't collide

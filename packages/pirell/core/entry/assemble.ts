@@ -1,98 +1,16 @@
-// The decorated pirell() surface: fully-assembled, method-carrying, with
-// type-level shape inference. Bare Wrapper lives in pirell.ts; runtime
-// builders in builders.ts.
+// pirell() runtime entry point. Surface types (Assembled<S>, Fluent<F,S>,
+// etc.) live in types/assembled.ts and types/fluent.ts — this file is
+// just the two-overload function and its re-exports for callers who
+// import surface types from here (backward-compatible import path).
 
 import { buildDeferred, buildBound } from "./builders.js";
-import type {
-  Bound,
-  Deferred,
-  Dim,
-  Fluent,
-  Op,
-  Raw,
-  Shape,
-} from "../types/base.js";
-import type { CheckShape } from "../types/match-shape.js";
-import type { Tail } from "../types/chain.js";
+import type { Bound, Deferred } from "../types/base.js";
+import type { ShapeOf } from "../types/codec.js";
+import type { Assembled, OpMap } from "../types/assembled.js";
 
-export type OpMap = Record<string, Op<any, any, any>>;
+export type { Assembled, OpMap };
 
-// What the next op sees: unwraps a surface whose Shape param is always
-// already proven, so no structural inference is needed (unlike chain.ts's
-// link matching — different layer, not a duplicate; see PLAN.md's
-// "Unify ShapeOfCur/CurrentData").
-type CurrentData<S> =
-  S extends Bound<infer Shp extends Shape>
-    ? Raw<Shp>
-    : S extends Deferred<infer Out extends Shape>
-      ? Raw<Out>
-      : never;
-
-// Proven shape of CurrentData<S>: the CurShp half of Tail's threading.
-// Always in lockstep above: Raw<Shp> value, Shp shape.
-type CurrentShp<S> =
-  S extends Bound<infer Shp extends Shape>
-    ? Shp
-    : S extends Deferred<infer Out extends Shape>
-      ? Out
-      : ["..."];
-
-// Retypes the surface after an op to reflect the new output shape.
-type Reassembled<S, Shp extends Shape> =
-  S extends Bound<any>
-    ? Assembled<Bound<Shp>>
-    : S extends Deferred<any>
-      ? Assembled<Deferred<Shp>>
-      : never;
-
-// An op fits the surface iff its input shape matches the current data.
-type Fits<In extends Shape, S, Yes> =
-  CheckShape<In, Extract<CurrentData<S>, Shape>> extends Shape ? Yes : never;
-
-// Chain constraint, shared by pipe/compose: first fn takes current data.
-type ChainFns<S> = [
-  (arg: CurrentData<S>) => any,
-  ...Array<(arg: any) => any>,
-];
-
-// Deferred-only compose member, split out so Assembled stays flat.
-type Composable<S> = S extends Deferred<any>
-  ? {
-      compose<Fns extends ChainFns<S>>(
-        ...fns: Fns & Tail<Fns, CurrentData<S>, CurrentShp<S>>
-      ): Assembled<S>;
-    }
-  : unknown;
-
-// compose() is Deferred-only: a Bound surface has no un-applied state to
-// compose into, so it would just be pipe() under a name promising the
-// opposite. The runtime is built once as a plain callable and cast here —
-// per-call-rebuild inference is an intentional non-goal.
-export type Assembled<S> = S & {
-  extend<K extends string, Op1 extends Op<any, any, any>>(
-    ops: Op1 extends Op<infer In, any, any>
-      ? Fits<In, S, Record<K, Op1>>
-      : never,
-  ): Op1 extends Op<any, infer Out, any>
-    ? Reassembled<S, Out> & { [P in K]: Fluent<Op1> }
-    : never;
-  extend<Ops extends OpMap>(
-    ops: Ops & {
-      [K in keyof Ops]: Ops[K] extends Op<infer In, any, any>
-        ? Fits<In, S, Ops[K]>
-        : never;
-    },
-  ): Assembled<S> & {
-    [K in keyof Ops]: Fluent<Ops[K] & Op<any, any, any>>;
-  };
-  pipe<Fns extends ChainFns<S>>(
-    ...fns: Fns & Tail<Fns, CurrentData<S>, CurrentShp<S>>
-  ): S extends Bound<any> ? unknown : Assembled<S>;
-} & Composable<S>;
-
-// pirell(data) → Bound surface; pirell() → Deferred builder. Arity (not an
-// explicit undefined) selects the form, so a bound undefined stays invalid.
-export function pirell(data: unknown): Assembled<Bound<Dim[]>>;
+export function pirell<T>(data: T): Assembled<Bound<ShapeOf<T>>>;
 export function pirell(): Assembled<Deferred<[]>>;
 export function pirell(...args: [unknown] | []): unknown {
   if (args.length === 0) {
