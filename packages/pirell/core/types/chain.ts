@@ -1,7 +1,6 @@
 import type { Op, Raw, Shape } from "./base.js";
 import type { MatchShape } from "./match-shape.js";
-import type { ShapeOf } from "./codec.js";
-import type { CheckData } from "./match-data.js";
+import type { ShapeOf, DataOf } from "./codec.js";
 
 // --- Shape gate for compose/pipe ---
 
@@ -52,8 +51,20 @@ type ChainEnds<Fns extends readonly unknown[]> =
 
 // Shared by compose's return and pipe's signature so the data gate can't
 // drift between the two call sites.
-export type ComposeGate<Fns extends readonly unknown[], D> = D &
-  CheckData<ChainEnds<Fns>[0] extends infer I extends Shape ? I : ["..."], D>;
+// PROBE: gate narrowed to plain structural assignability against the
+// first op's DataOf<In> (D extends DataOf<I>), replacing the full
+// MatchData lattice walk. Ordinary TS generic-constraint checking — the
+// same mechanism Op's own DataOf<In> param already relies on, no
+// CheckData/NormalizeData needed. Falls through to D (not never) when
+// ChainEnds can't resolve (e.g. degenerate/non-chain Fns shapes reached
+// via makeFlat's generic path) — matches the original's `D & unknown`
+// graceful-degradation behavior instead of hard-rejecting those cases.
+export type ComposeGate<Fns extends readonly unknown[], D> =
+  ChainEnds<Fns> extends [infer I extends Shape, ...unknown[]]
+    ? D extends DataOf<I>
+      ? D
+      : never
+    : D;
 
 // One link step, tagged so a mismatch is a distinct shape (`{ok: false}`)
 // rather than a bare `never` a tuple pattern would match vacuously. Tail
