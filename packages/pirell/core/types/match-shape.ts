@@ -8,37 +8,26 @@ import type { Elem, ElemCase, Shape } from "./base.js";
 // (branch and variants both never) claims only dim+kind, so any
 // same-dim+kind ActualE satisfies it; a declared InE compares its payload
 // arm (branch xor variants — never-guarded both sides, since bare never
-// matches everything).
+// matches everything). Indexed access (not extends-destructure) re-references
+// ElemCase<InE>/ElemCase<ActualE> through tsc's per-argument alias cache
+// instead of re-running a pattern match to bind each field — same fix
+// already landed on MatchHead in chain.ts's match-data path (see PLAN.md).
 type MatchElem<InE extends Elem, ActualE extends Elem> =
-  ElemCase<InE> extends {
-    dim: infer IDim;
-    kind: infer IKind;
-    branch: infer IBr;
-    variants: infer IV;
-  }
-    ? ElemCase<ActualE> extends {
-        dim: infer ADim;
-        kind: infer AKind;
-        branch: infer ABr;
-        variants: infer AV;
-      }
-      ? ADim extends IDim
-        ? AKind extends IKind
-          ? [IBr] extends [never]
-            ? [IV] extends [never]
+  ElemCase<ActualE>["dim"] extends ElemCase<InE>["dim"]
+    ? ElemCase<ActualE>["kind"] extends ElemCase<InE>["kind"]
+      ? [ElemCase<InE>["branch"]] extends [never]
+        ? [ElemCase<InE>["variants"]] extends [never]
+          ? true
+          : [ElemCase<ActualE>["variants"]] extends [never]
+            ? false
+            : ElemCase<ActualE>["variants"] extends ElemCase<InE>["variants"]
               ? true
-              : [AV] extends [never]
-                ? false
-                : AV extends IV
-                  ? true
-                  : false
-            : [ABr] extends [never]
-              ? false
-              : ABr extends IBr
-                ? true
-                : false
-          : false
-        : false
+              : false
+        : [ElemCase<ActualE>["branch"]] extends [never]
+          ? false
+          : ElemCase<ActualE>["branch"] extends ElemCase<InE>["branch"]
+            ? true
+            : false
       : false
     : false;
 
