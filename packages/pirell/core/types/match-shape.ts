@@ -10,8 +10,7 @@ import type { Elem, ElemCase, Shape } from "./base.js";
 // arm (branch xor variants — never-guarded both sides, since bare never
 // matches everything). Indexed access (not extends-destructure) re-references
 // ElemCase<InE>/ElemCase<ActualE> through tsc's per-argument alias cache
-// instead of re-running a pattern match to bind each field — same fix
-// already landed on MatchHead in chain.ts's match-data path (see PLAN.md).
+// instead of re-running a pattern match to bind each field.
 type MatchElem<InE extends Elem, ActualE extends Elem> =
   ElemCase<ActualE>["dim"] extends ElemCase<InE>["dim"]
     ? ElemCase<ActualE>["kind"] extends ElemCase<InE>["kind"]
@@ -47,7 +46,6 @@ export type MatchShape<In extends Shape, Actual extends Shape> = In extends []
         : false
       : false;
 
-// Narrowing gate: the Shape-side counterpart of CheckData (which narrows
-// Shape×Data). Returns the matched Shape for callers that keep it.
+// Narrowing gate: returns the matched Shape for callers that keep it.
 export type CheckShape<In extends Shape, Actual extends Shape> =
   MatchShape<In, Actual> extends true ? Actual : never;

@@ -153,8 +153,8 @@ describe("type rejection through chains", () => {
   it("accepts nested values when expecting bare k (more detail is welcome)", () => {
     // Bare ["k"] claims only keyed-ness — DataOf<["k"]> is
     // Record<string, unknown> — so nested values satisfy it. Depth
-    // rejection now lives in CheckData/ShapeOf (bare literals), not in the
-    // op's own data param.
+    // rejection lives in ShapeOf (bare literals), not in the op's own
+    // data param.
     const nested = { x: [1, 2] };
     expect(toEntries()(nested)).toEqual([["x", [1, 2]]]);
   });

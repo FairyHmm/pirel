@@ -19,7 +19,7 @@ import {
   measure,
   parseArgs,
   renderTable,
-} from "./utils.mts";
+} from "./utils.js";
 
 // --- Call-site count catalog (single op, distinct data per site) ---
 

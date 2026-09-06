@@ -22,7 +22,7 @@ import {
   measure,
   parseArgs,
   renderTable,
-} from "./utils.mts";
+} from "./utils.js";
 
 // --- Chain length catalog ---
 

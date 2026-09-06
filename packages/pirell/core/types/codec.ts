@@ -58,8 +58,7 @@ type DataOfElem<E extends Elem, Rest extends Shape> = E extends Dim
 
 // Derives a Shape from a bare literal so calls need no `as Raw<S>` cast.
 // Used by chain.ts where no declared Op exists (bare-thunk/plain-fn link
-// outputs). CheckData does NOT route through this — match-data.ts walks In
-// against D directly instead.
+// outputs).
 
 // True iff T is a genuine union (naked-T distributive trick).
 export type IsUnion<T, U = T> = T extends U

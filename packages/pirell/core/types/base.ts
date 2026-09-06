@@ -20,8 +20,7 @@ export type MixedTag = `${Dim}...`;
 export type Elem = Dim | MixedTag | [Dim, Branch] | [MixedTag, Variants];
 
 // Every bare tag's dim in one lookup — replaces DimOf template inference.
-// Shared by DataOfElem (codec.ts), Normalize (match.ts), and NormalizeData
-// (match-data.ts).
+// Shared by DataOfElem (codec.ts) and Normalize (match.ts).
 export type DimTable = {
   i: "i";
   "i...": "i";
@@ -32,11 +31,10 @@ export type DimTable = {
 // Open-tail applies only to nested Shape; Mixed/MixedTag are terminal.
 export type Shape = Elem[] | [...Elem[], "..."];
 
-// One canonical Elem classification. match-shape.ts (compare payloads)
-// and match-data.ts (descend into values or check the branch) branch off
-// its fields instead of re-spelling the four cases each. Bare-vs-declared
-// stays visible (branch/variants set or never) — that distinction drives
-// both matchers' continuations, so no normalizer may erase it.
+// One canonical Elem classification. match-shape.ts branches off its
+// fields instead of re-spelling the four cases. Bare-vs-declared stays
+// visible (branch/variants set or never) — that distinction drives the
+// matcher's continuation, so no normalizer may erase it.
 export type ElemCase<E extends Elem> = E extends Dim
   ? { dim: E; kind: "leaf"; branch: never; variants: never }
   : E extends MixedTag
@@ -68,15 +66,15 @@ export type Raw<S extends Shape> = [unknown] extends [DataOf<S>]
 // Every op's data param carries its own In claim, enforced by ordinary TS
 // parameter-type checking at any call site — type checking, not runtime
 // checking: authoring is a plain JS function plus an annotation, no factory,
-// no wrapper. The strict MatchData lattice (mixed-vs-leaf and friends) still
-// lives at the compose/pipe gate (ComposeGate→CheckData); a future pass will
-// relax compose now that the raw claim is per-function. Detours removed: a
-// checked() wrapper (added an import), a generic <D>-surface Op with a
-// rest-tuple gate (authoring either needed a makeOp factory or lost body
-// typing), and an intersecting generic param (TS decomposes intersection
-// sources during inference; conditional-on-D verdicts were
-// directory-state-sensitive). __pirell brand is gone; thunk-vs-plain-fn
-// discrimination is structural (arity), handled in compose.ts — see PLAN.md.
+// no wrapper. Pipe/compose check the entry data param directly against
+// DataOf<FirstIn<Fns>> (compose.ts); wrap checks per-call via Fluent's
+// MatchShape (fluent.ts). Detours removed: a checked() wrapper (added an
+// import), a generic <D>-surface Op with a rest-tuple gate (authoring
+// either needed a makeOp factory or lost body typing), and an
+// intersecting generic param (TS decomposes intersection sources during
+// inference; conditional-on-D verdicts were directory-state-sensitive).
+// __pirell brand is gone; thunk-vs-plain-fn discrimination is structural
+// (arity), handled in compose.ts — see PLAN.md.
 export type Op<
   In extends Shape,
   Out extends Shape,

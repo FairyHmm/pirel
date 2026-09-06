@@ -1,8 +1,7 @@
 import { describe, expectTypeOf, it } from "vitest";
 import type { CheckShape } from "./match-shape.js";
 import type { ShapeOf, DataOf } from "./codec.js";
-import type { MatchData } from "./match-data.js";
-import type { Raw, Shape } from "./base.js";
+import type { Shape } from "./base.js";
 
 // Named-field shapes for testing both acceptance and rejection.
 type UserShape = ["k...", { name: string; age: number }];
@@ -79,9 +78,9 @@ describe("shape matching: CheckShape", () => {
   });
 
   // Declared-variants payloads compare structurally (VActual extends VIn):
-  // the canonical ElemCase drops V for match-data's kind-only check, but
-  // MatchElem's variants arm still compares payloads — removing that arm
-  // would silently accept this.
+  // the canonical ElemCase drops V for the kind-only check, but MatchElem's
+  // variants arm still compares payloads — removing that arm would
+  // silently accept this.
   it("declared-variants In rejects an incompatible-V Actual", () => {
     type Result = CheckShape<[["i...", [number]]], [["i...", [string]]]>;
     expectTypeOf<Result>().toEqualTypeOf<never>();
@@ -141,95 +140,8 @@ describe("shape inference: ShapeOf", () => {
   });
 });
 
-// DataOf (codec.ts, Shape→type for bodies) and MatchData (match-data.ts,
-// Shape↔Data gate) implement the same four-case Elem analysis twice, in
-// different vocabularies — a drift footgun. These cases couple them: each
-// asserts the PAIR [match verdict, DataOf acceptance], so a change to
-// either descent breaks the tuple loudly. The [false, true] pairs are
-// deliberate strictness (MatchData may exceed DataOf, never trail it —
-// otherwise the gate would admit what the body can't handle).
-describe("correspondence: DataOf vs MatchData", () => {
-  type Matches<In extends Shape, D> =
-    MatchData<In, D> extends true ? true : false;
-  type Accepts<D, T> = [D] extends [T] ? true : false;
-  type Case<In extends Shape, D> = [Matches<In, D>, Accepts<D, DataOf<In>>];
-
-  it("bare dims agree on acceptance", () => {
-    expectTypeOf<Case<["i"], number[]>>().toEqualTypeOf<[true, true]>();
-    expectTypeOf<Case<["k"], { a: 1 }>>().toEqualTypeOf<[true, true]>();
-  });
-
-  it("declared payloads agree on acceptance", () => {
-    expectTypeOf<Case<[["i", number]], number[]>>().toEqualTypeOf<
-      [true, true]
-    >();
-    expectTypeOf<
-      Case<[["k", { name: string }]], { user: { name: string } }>
-    >().toEqualTypeOf<[true, true]>();
-  });
-
-  it("mixed, open, empty, and nested shapes agree on acceptance", () => {
-    expectTypeOf<Case<["i..."], (number | string)[]>>().toEqualTypeOf<
-      [true, true]
-    >();
-    expectTypeOf<Case<["k", "..."], { a: 1 }>>().toEqualTypeOf<[true, true]>();
-    expectTypeOf<Case<[], {}>>().toEqualTypeOf<[true, true]>();
-    expectTypeOf<
-      Case<[["k", [["i", number]]]], { a: number[] }>
-    >().toEqualTypeOf<[true, true]>();
-  });
-
-  it("dim mismatches agree on rejection", () => {
-    expectTypeOf<Case<["i"], { a: 1 }>>().toEqualTypeOf<[false, false]>();
-    expectTypeOf<Case<[["k", number]], { a: "x" }>>().toEqualTypeOf<
-      [false, false]
-    >();
-  });
-
-  // A declared [] payload checks EVERY value for emptiness; a bare dim
-  // claims nothing about values. DataOf erases both to the same
-  // Record<string, unknown> — the gate must not be "fixed" to agree.
-  it("declared-empty is strictly narrower than bare (do not unify)", () => {
-    expectTypeOf<Case<[["k", []]], { a: 5 }>>().toEqualTypeOf<[false, true]>();
-    expectTypeOf<Case<[["k", []]], { a: [] }>>().toEqualTypeOf<[true, true]>();
-  });
-
-  // Leaf comparison is bidirectional (invariance-like): a tuple is not
-  // widened to its element type, even though it extends the array.
-  it("leaf invariance is strictly narrower than assignability (do not loosen)", () => {
-    expectTypeOf<Case<[["i", number]], [1, 2]>>().toEqualTypeOf<
-      [false, true]
-    >();
-  });
-
-  // An empty container normalizes to mixed kind (vacuous never), so bare
-  // leaf claims reject it; only In=[] accepts empties. Pre-existing,
-  // not a regression — pin it so nobody "fixes" the kind rule.
-  it("bare claims reject empty containers (do not relax)", () => {
-    expectTypeOf<Case<["k"], {}>>().toEqualTypeOf<[false, true]>();
-  });
-
-  // Reflexivity: MatchData<In, DataOf<In>> must hold — the matcher accepts
-  // its own domain, including branded Raw values (brand-blind keyof) and
-  // opaque values at mixed positions (opacity fallback). These failed
-  // before the fixes (toEntries output rejected at ["i","i..."], branded
-  // keyed outputs rejected at ["k"]) while the same chains typechecked
-  // through Tail — the gate trailed DataOf, which the header forbids.
-  it("matcher accepts its own domain, branded or opaque (do not regress)", () => {
-    expectTypeOf<Case<["i", "i..."], unknown[][]>>().toEqualTypeOf<
-      [true, true]
-    >();
-    expectTypeOf<Case<["i", "i..."], Raw<["i", "i..."]>>>().toEqualTypeOf<
-      [true, true]
-    >();
-    expectTypeOf<Case<["k..."], Record<string, unknown>>>().toEqualTypeOf<
-      [true, true]
-    >();
-    expectTypeOf<Case<["k"], Record<string, number>>>().toEqualTypeOf<
-      [true, true]
-    >();
-    expectTypeOf<Case<["k"], Raw<[["k", number]]>>>().toEqualTypeOf<
-      [true, true]
-    >();
-  });
-});
+// The DataOf/MatchData correspondence suite was retired along with
+// match-data.ts: MatchData/CheckData were unreferenced elsewhere since
+// 53b5be1 (the compose/wrap gates check directly against DataOf/MatchShape
+// now — see base.ts, compose.ts, fluent.ts), so the pins only proved a
+// dead type agreed with itself. See PLAN.md.
