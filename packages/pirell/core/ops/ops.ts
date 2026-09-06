@@ -13,16 +13,15 @@ export function makeCurry<A extends unknown[], D, R>(
       fn(data, ...args);
 }
 
-// Type-level curried → flat. A gated data param (compose's
-// `<D>(data: ComposeGate<Fns,D>)`) does not round-trip — the gate lives
-// at compose.ts, not in this shape-agnostic converter.
+// Type-level curried → flat. A data param closed over outer generics
+// (compose's `(data: DataOf<FirstIn<Fns>>)` inner return) does not
+// round-trip — the entry claim lives at compose.ts, not in this
+// shape-agnostic converter.
 type Flatten<F> = F extends (...args: infer A) => (data: infer Data) => infer R
   ? (data: Data, ...args: A) => R
   : never;
 
 // makeFlat: curried → flat; general form converter.
-export function makeFlat<F extends (...args: any) => any>(
-  fn: F,
-): Flatten<F> {
+export function makeFlat<F extends (...args: any) => any>(fn: F): Flatten<F> {
   return ((data: any, ...args: any[]) => fn(...args)(data)) as Flatten<F>;
 }

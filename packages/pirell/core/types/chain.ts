@@ -49,22 +49,19 @@ type ChainEnds<Fns extends readonly unknown[]> =
       : never
     : never;
 
-// Shared by compose's return and pipe's signature so the data gate can't
-// drift between the two call sites.
-// PROBE: gate narrowed to plain structural assignability against the
-// first op's DataOf<In> (D extends DataOf<I>), replacing the full
-// MatchData lattice walk. Ordinary TS generic-constraint checking — the
-// same mechanism Op's own DataOf<In> param already relies on, no
-// CheckData/NormalizeData needed. Falls through to D (not never) when
-// ChainEnds can't resolve (e.g. degenerate/non-chain Fns shapes reached
-// via makeFlat's generic path) — matches the original's `D & unknown`
-// graceful-degradation behavior instead of hard-rejecting those cases.
-export type ComposeGate<Fns extends readonly unknown[], D> =
-  ChainEnds<Fns> extends [infer I extends Shape, ...unknown[]]
-    ? D extends DataOf<I>
-      ? D
-      : never
-    : D;
+// First link's In, read off the normalized chain — the entry claim shared
+// by compose's return and pipe's signature so the two call sites can't
+// drift. ["..."] (unknown data claim) wherever ChainEnds also gives up
+// (non-Op / parameterized / empty: graceful degradation, not rejection).
+// The data param is typed DataOf<FirstIn<Fns>> directly — no per-call D
+// generic, so distinct literals cost plain assignability (~0), the same
+// mechanism Op's own DataOf<In> param already relies on.
+export type FirstIn<Fns extends readonly unknown[]> =
+  ComposeChain<Fns> extends [infer First, ...unknown[]]
+    ? First extends Op<infer FIn extends Shape, any, []>
+      ? FIn
+      : ["..."]
+    : ["..."];
 
 // One link step, tagged so a mismatch is a distinct shape (`{ok: false}`)
 // rather than a bare `never` a tuple pattern would match vacuously. Tail

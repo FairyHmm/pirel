@@ -1,8 +1,9 @@
 import type {
   ComposeChain,
   ComposeResult,
-  ComposeGate,
+  FirstIn,
 } from "../types/chain.js";
+import type { DataOf } from "../types/codec.js";
 import { makeFlat } from "../ops/ops.js";
 
 // Untyped runtime shared by the typed compose wrapper below and the
@@ -35,20 +36,21 @@ export function composeRaw(...fns: Array<(x: any) => any>): (x: any) => any {
     }, x);
 }
 
-// Returns a function — data is applied later, shape-gated at that call.
+// Returns a function — data is applied later, checked then against the
+// first link's entry claim.
 export function compose<Fns extends unknown[]>(
   ...fns: Fns & ComposeChain<Fns>
-): <D>(data: ComposeGate<Fns, D>) => ComposeResult<Fns>;
+): (data: DataOf<FirstIn<Fns>>) => ComposeResult<Fns>;
 export function compose(...fns: Array<(x: any) => any>): (x: any) => any {
   return composeRaw(...fns);
 }
 
 // Data-first view of compose. makeFlat is a shape-agnostic form converter,
-// so `makeFlat(compose)` carries no gate — the gate is authored here, at
-// compose/pipe's own site (not in makeFlat). Same ComposeGate/ComposeChain/
-// ComposeResult compose uses, flipped to (data, ...fns).
-type PipeFn = <D, Fns extends unknown[]>(
-  data: ComposeGate<Fns, D>,
+// so `makeFlat(compose)` carries no claim — the entry claim is authored
+// here, at compose/pipe's own site (not in makeFlat). Same
+// ComposeChain/ComposeResult compose uses, flipped to (data, ...fns).
+type PipeFn = <Fns extends unknown[]>(
+  data: DataOf<FirstIn<Fns>>,
   ...fns: Fns & ComposeChain<Fns>
 ) => ComposeResult<Fns>;
 
