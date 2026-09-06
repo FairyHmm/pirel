@@ -1,8 +1,5 @@
-// Markdown tables (constant-width) for the probe. Stability (tsc 7):
-// marginals are the signal — totals repeat back-to-back byte-identically.
-// Colds wobble ±300 with load/tree churn: quiet machine, no create/delete
-// between A/B, ignore cold deltas under a few hundred. Length slopes are
-// concave — pass ≥3 lengths, read the last interval.
+// Generic table rendering and number formatting. Shared by the probe
+// (tsc instantiation deltas) and the bench (runtime µs/call).
 
 export const fmt = (n: number): string => n.toLocaleString("en-US");
 
@@ -37,65 +34,5 @@ export function renderTable(head: string[], rows: string[][]): string {
 }
 
 // One count cell: inst count (aligns left) + check time in ms (aligns right).
-const countCell = (inst: number, checkSecs: number): string =>
-  `${fmt(inst)} \t ${Math.round(checkSecs * 1000)}ms`;
-
-export function countsHead(counts: number[]): string[] {
-  return [
-    "Scenario",
-    ...counts.map((n) => (n === 1 ? "n=1 (cold)" : `n=${n}`)),
-    "Growth",
-    "Marginal",
-  ];
-}
-
-export function countsRow(
-  name: string,
-  deltas: number[],
-  checks: number[],
-  counts: number[],
-): string[] {
-  // Growth + marginal use the two largest counts (steady state, past
-  // the n=1 cold cost). Needs ≥2 counts.
-  const dLast = deltas.at(-1) ?? 0;
-  const dPrev = deltas.length > 1 ? (deltas.at(-2) ?? 0) : 0;
-  const nLast = counts.at(-1) ?? 0;
-  const nPrev = counts.length > 1 ? (counts.at(-2) ?? 0) : 0;
-  const steady =
-    deltas.length > 1 && dPrev > 0 && nLast > nPrev
-      ? [
-          `${(dLast / dPrev).toFixed(2)}×`,
-          `~${((dLast - dPrev) / (nLast - nPrev)).toFixed(1)}`,
-        ]
-      : ["—", "—"];
-  return [name, ...deltas.map((d, k) => countCell(d, checks[k]!)), ...steady];
-}
-
-export function lengthsHead(lengths: number[], calls: number): string[] {
-  return [
-    `Scenario (${calls} calls)`,
-    ...lengths.map((l) => `len=${l}`),
-    "Marginal",
-  ];
-}
-
-export function lengthsRow(
-  name: string,
-  deltas: number[],
-  checks: number[],
-  lengths: number[],
-  divisor: number,
-): string[] {
-  // Per-link slope across the two longest chains. Distinct-D scenarios
-  // pass calls as the divisor (one chain's per-link cost); per-chain
-  // scenarios pass 1 (see Scenario.sweepPerChain). Needs ≥2 lengths.
-  const dLast = deltas.at(-1) ?? 0;
-  const dPrev = deltas.length > 1 ? (deltas.at(-2) ?? 0) : 0;
-  const lLast = lengths.at(-1) ?? 0;
-  const lPrev = lengths.length > 1 ? (lengths.at(-2) ?? 0) : 0;
-  const steady =
-    deltas.length > 1 && lLast > lPrev
-      ? `~${((dLast - dPrev) / ((lLast - lPrev) * divisor)).toFixed(2)}`
-      : "—";
-  return [name, ...deltas.map((d, k) => countCell(d, checks[k]!)), steady];
-}
+export const countCell = (inst: number, checkSecs: number): string =>
+  `${fmt(inst)}\t ${Math.round(checkSecs * 1000)}ms`;
