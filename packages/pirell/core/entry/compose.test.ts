@@ -80,7 +80,7 @@ describe("pipe", () => {
 });
 
 // pipe/compose also integrate directly with pirell Ops (see shape-inference.md).
-// Kept here, not assemble.test.ts: assemble only wires surfaces together.
+// Kept here, not in bound/deferred/mixed.test.ts: those only wire surfaces together.
 describe("standalone pipe/compose with pirell Ops", () => {
   it("pipe(data, fns) works directly on raw JSON", () => {
     // No cast — ShapeOf derives [["i", number]] from the number[] literal
