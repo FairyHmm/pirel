@@ -54,21 +54,26 @@ type Composable<S> =
 // (.toEntries()), not at registration. See PLAN.md "relocate .extend()'s
 // shape check onto Fluent/call-site".
 //
-// One overload only, gated on IsUnion<keyof Ops>: a single-key object
-// narrows the surface via that op's Out (ARCHITECTURE.md: "type-narrows
-// on single ops"); a multi-key object keeps S as-is (ARCHITECTURE.md:
-// "not on multi-op calls" — see STATE.md for the overload-collision bug
-// this replaced).
+// Bound keeps its data-proven S with no key-count dance: the Fluent call
+// narrows to Bound<Out> anyway, and per-site K-inference + Out-inference
+// + Reassembled never cache (fresh literal identities), costing ~16/call
+// for nothing the call doesn't already provide. Deferred has no data, so
+// it keeps the full narrowing path — its only shape source (load-bearing:
+// single-key Deferred chains break without it). Multi-key keeps S as-is
+// (ARCHITECTURE.md: "not on multi-op calls" — see STATE.md for the
+// overload-collision bug the IsUnion gate replaced).
 export type Assembled<S> = S & {
   extend<Ops extends OpMap>(
     ops: Ops,
-  ): IsUnion<keyof Ops> extends true
-    ? Assembled<S> & { [P in keyof Ops]: Fluent<Ops[P], S, Ops> }
-    : keyof Ops extends infer K extends keyof Ops
-      ? Ops[K] extends Op<any, infer Out extends Shape, any>
-        ? Reassembled<S, Out> & { [P in keyof Ops]: Fluent<Ops[P], S, Ops> }
+  ): S extends Deferred<any>
+    ? IsUnion<keyof Ops> extends true
+      ? Assembled<S> & { [P in keyof Ops]: Fluent<Ops[P], S, Ops> }
+      : keyof Ops extends infer K extends keyof Ops
+        ? Ops[K] extends Op<any, infer Out extends Shape, any>
+          ? Reassembled<S, Out> & { [P in keyof Ops]: Fluent<Ops[P], S, Ops> }
+          : never
         : never
-      : never;
+    : Assembled<S> & { [P in keyof Ops]: Fluent<Ops[P], S, Ops> };
   pipe<Fns extends ChainFns<S>>(
     ...fns: Fns & Tail<Fns, CurrentData<S>, CurrentShp<S>>
   ): S extends Bound<any> ? unknown : Assembled<S>;
