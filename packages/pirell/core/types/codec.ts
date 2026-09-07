@@ -5,6 +5,7 @@ import type {
   MixedTag,
   Raw,
   Shape,
+  ShapeBrand,
   Variants,
 } from "./base.js";
 
@@ -92,12 +93,21 @@ type IsConcreteLeaf<E> = [unknown] extends [E]
 // Only trust the Raw brand when S is a concrete non-empty tuple (a real
 // brand can only exist then: Raw<[]>/Raw<["..."]> collapse to unknown).
 // Otherwise structural derivation, which round-trips bare literals.
+// Brand-presence gate: the Raw<S> inference runs only when D carries the
+// brand symbol. Unbranded (fresh-literal) inputs skip it — the inference
+// can never yield a usable S there (no brand to infer from; a brand-less
+// structural match infers S ~ unknown, fails the tuple check, and falls
+// to ShapeOfElem anyway), so the gate preserves semantics exactly while
+// skipping ~2/3 of the per-site shape cost (probe: ShapeOf 58/site vs
+// ShapeOfElem 19/site).
 type _ShapeOf<D> =
   string extends keyof D
     ? ShapeOfElem<D>
-    : D extends Raw<infer S extends Shape>
-      ? S extends [Elem, ...Shape]
-        ? S
+    : ShapeBrand extends keyof D
+      ? D extends Raw<infer S extends Shape>
+        ? S extends [Elem, ...Shape]
+          ? S
+          : ShapeOfElem<D>
         : ShapeOfElem<D>
       : ShapeOfElem<D>;
 
@@ -109,11 +119,14 @@ type ShapeOfElem<D> = D extends readonly (infer E)[]
     : IsConcreteLeaf<E> extends true
       ? [["i", E]]
       : ["i", ...ContainerTail<E>]
+  // Uniform-first: concrete-leaf check before the union check, so
+  // uniform objects (the common case) skip IsUnion entirely. Mixed
+  // objects pay both checks — prioritising uniform over mixed.
   : D extends object
-    ? IsUnion<D[keyof D]> extends true
-      ? ["k..."]
-      : IsConcreteLeaf<D[keyof D]> extends true
-        ? [["k", D[keyof D]]]
+    ? IsConcreteLeaf<D[keyof D]> extends true
+      ? [["k", D[keyof D]]]
+      : IsUnion<D[keyof D]> extends true
+        ? ["k..."]
         : ["k", ...ContainerTail<D[keyof D]>]
     : [];
 

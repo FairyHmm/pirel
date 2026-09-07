@@ -58,6 +58,10 @@ export type ElemCase<E extends Elem> = E extends Dim
 // optional-key object — so with no shape claim, Raw<S> stays unbranded
 // unknown rather than an unsatisfiable object type.
 declare const __shapeBrand: unique symbol;
+// Exported for codec.ts's brand-presence gate: `ShapeBrand extends keyof D`
+// skips the Raw<S> inference for unbranded (fresh-literal) inputs, where it
+// can never yield a usable S. See _ShapeOf.
+export type ShapeBrand = typeof __shapeBrand;
 export type Raw<S extends Shape> = [unknown] extends [DataOf<S>]
   ? unknown
   : DataOf<S> & { readonly [__shapeBrand]?: S };
