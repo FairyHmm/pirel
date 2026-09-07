@@ -59,11 +59,91 @@ function topicScenarios(t: Topic): Scenario[] {
   ];
 }
 
+// Wrap breakdown: isolate pirell-only, pirell+extend, pirell+extend+call
+// to show how the wrap marginal distributes across the surface lifecycle.
+function wrapBreakdown(t: Topic): Scenario[] {
+  const { name, data, links } = t;
+  return [
+    {
+      name: `${name}-pirell`,
+      summary: `pirell(data) only — no extend, no call.`,
+      emit: (i) => `const s${i} = pirell(${data(i)});`,
+      defaultLen: 1,
+      sweepLen: false,
+      sweepPerChain: false,
+    },
+    {
+      name: `${name}-extend`,
+      summary: `pirell(data).extend({...}) — pirell + extend, no call.`,
+      emit: (i) => `const s${i} = pirell(${data(i)}).extend({ ${links[0]} });`,
+      defaultLen: 1,
+      sweepLen: false,
+      sweepPerChain: false,
+    },
+    {
+      name: `${name}-call`,
+      summary: `pirell(data).extend({...}).op() — pirell + extend + call (no .value).`,
+      emit: (i) => `const s${i} = pirell(${data(i)}).extend({ ${links[0]} }).${links[0]}();`,
+      defaultLen: 1,
+      sweepLen: false,
+      sweepPerChain: false,
+    },
+  ];
+}
+
+// Stable-type demo: named interface Row (not inline literal). Tests
+// whether the per-site freshness floor (75/site for fresh object
+// literals) is reachable via usage-side type stability — no core
+// change needed.
+const STABLE_PREFIX = "interface Row { a: number; k: number; }";
+
+const stableBreakdown: Scenario[] = [
+  {
+    name: "obj-stable",
+    summary: `Named interface Row (not inline literal) → toEntries.`,
+    emit: (i) => {
+      const v = `r${i}`;
+      return `const ${v}: Row = { a: 1, k: ${i} }; const s${i} = pirell(${v}).extend({ toEntries }).toEntries().value;`;
+    },
+    defaultLen: 1,
+    sweepLen: false,
+    sweepPerChain: false,
+  },
+  {
+    name: "obj-stable-pirell",
+    summary: `Named interface Row, pirell only.`,
+    emit: (i) => {
+      const v = `r${i}`;
+      return `const ${v}: Row = { a: 1, k: ${i} }; const s${i} = pirell(${v});`;
+    },
+    defaultLen: 1,
+    sweepLen: false,
+    sweepPerChain: false,
+  },
+];
+
 const SCENARIOS: Scenario[] = [
+  // Wrap breakdown for single (array, one op): isolates pirell-only,
+  // pirell+extend, pirell+extend+call. Shows how the 36/site wrap
+  // marginal distributes across the surface lifecycle.
+  ...wrapBreakdown({
+    name: "single",
+    data: () => "[1,2,3]",
+    links: ["double"],
+  }),
   ...topicScenarios({
     name: "single",
     data: () => "[1,2,3]",
     links: ["double"],
+  }),
+  // Wrap breakdown for obj (uniform object, one op): shows how the
+  // 111/site obj-wrap marginal distributes. Compare with single's
+  // breakdown to see where the ~75 fresh-object-literal cost lives
+  // (pirell? extend? call?).
+  ...wrapBreakdown({
+    name: "obj",
+    data: (i) => `{a:1,k${i}:2}`,
+    links: ["toEntries"],
   }),
   ...topicScenarios({
     name: "obj",
@@ -78,11 +158,24 @@ const SCENARIOS: Scenario[] = [
     data: (i) => `{a:1,b:2,k${i}:3}`,
     links: ["toEntries"],
   }),
+  // Wrap breakdown for mixed1 (mixed object, one op): shows how the
+  // 89/site mixed1-wrap marginal distributes. Mixed is cheaper than
+  // uniform because bare ["k..."] has no Branch payload to construct.
+  ...wrapBreakdown({
+    name: "mixed1",
+    data: (i) => `{a:1,b:"x",k${i}:true}`,
+    links: ["stringifyValues"],
+  }),
   ...topicScenarios({
     name: "mixed1",
     data: (i) => `{a:1,b:"x",k${i}:true}`,
     links: ["stringifyValues"],
   }),
+  // Stable-type demo: named interface Row (not inline literal). Tests
+  // whether the per-site freshness floor (75/site for fresh object
+  // literals) is reachable via usage-side type stability — no core
+  // change needed.
+  ...stableBreakdown,
 ];
 
 function findScenario(name: string): Scenario {
@@ -113,7 +206,16 @@ function main(): void {
     const rows: string[][] = [];
     for (const name of names) {
       const s = findScenario(name);
-      const results = counts.map((n) => measure(stressFile(countBody(s, n))));
+      const isStable = s.name.startsWith("obj-stable");
+      const body = isStable
+        ? `${STABLE_PREFIX}\n${countBody(s, counts[counts.length - 1]!)}`
+        : countBody(s, counts[counts.length - 1]!);
+      const results = counts.map((n) => {
+        const b = isStable
+          ? `${STABLE_PREFIX}\n${countBody(s, n)}`
+          : countBody(s, n);
+        return measure(stressFile(b));
+      });
       const deltas = results.map((r) => r.inst - baseline.inst);
       rows.push(
         countsRow(
