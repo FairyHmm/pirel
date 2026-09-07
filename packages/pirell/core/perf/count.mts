@@ -70,6 +70,14 @@ const SCENARIOS: Scenario[] = [
     data: (i) => `{a:1,k${i}:2}`,
     links: ["toEntries"],
   }),
+  // 3-key uniform object → toEntries: matches mixed1's key count (3)
+  // to separate key-count effect from mixed-values effect when comparing
+  // obj-vs-mixed1. Same op as obj, only key count differs.
+  ...topicScenarios({
+    name: "obj3-u",
+    data: (i) => `{a:1,b:2,k${i}:3}`,
+    links: ["toEntries"],
+  }),
   ...topicScenarios({
     name: "mixed1",
     data: (i) => `{a:1,b:"x",k${i}:true}`,

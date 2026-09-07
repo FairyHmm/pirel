@@ -69,7 +69,7 @@ export type IsUnion<T, U = T> = T extends U
 
 // Narrows _ShapeOf's result for callers. A union element type is
 // heterogeneous by construction → "i..."/"k...".
-export type ShapeOf<D> = _ShapeOf<D> extends Shape ? _ShapeOf<D> : never;
+export type ShapeOf<D> = _ShapeOf<D> extends infer R extends Shape ? R : never;
 
 // Index-signature objects vacuously match `Raw<infer S>` (an optional
 // symbol key conflicts with nothing), inferring S as the whole Shape

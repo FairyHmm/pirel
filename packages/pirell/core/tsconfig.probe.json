@@ -12,6 +12,7 @@
     "perf/**/*.mts"
   ],
   "exclude": [
-    "**/*.test.ts"
+    "**/*.test.ts",
+    "perf/scratch/**"
   ]
 }
