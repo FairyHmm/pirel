@@ -1,6 +1,5 @@
 import type { Op, Raw, Shape } from "./base.js";
-import type { MatchShape } from "./match-shape.js";
-import type { ShapeOf, DataOf } from "./codec.js";
+import type { DataOf } from "./codec.js";
 
 // --- Shape gate for compose/pipe ---
 
@@ -13,13 +12,6 @@ type IsThunk<F> = F extends () => (data: any) => any ? true : false;
 type IsTuple<Fns extends readonly unknown[]> = number extends Fns["length"]
   ? false
   : true;
-
-// The proven-shape half of a Step pair is ShapeOf<R> as-is: intersecting
-// it with Shape (the old ProvenShape alias) broke the very next link,
-// because MatchShape's [infer Head extends Elem, ...] destructure fails
-// against an intersection while the clean tuple matches (proven by
-// scratch probe during the Angle-2 investigation — every bare->Op chain
-// was rejected before this fix).
 
 // Both ends of the chain, read off the single ComposeChain computation:
 // the first link's In feeds the input gate, the last link's Out feeds the
@@ -69,42 +61,47 @@ export type FirstIn<Fns extends readonly unknown[]> =
 // needed before destructuring, because the false arm simply doesn't
 // satisfy the `{ok: true, ...}` pattern (measured cheaper per recursion
 // frame than the old bind-then-guard-then-destructure sequence; see
-// PLAN.md). A thunk link with a declared Op matches against the threaded
-// proven shape and carries FOut forward with zero inference. ShapeOf runs
-// only where no declared shape exists (bare-thunk/plain-fn outputs).
-type Step<F, Cur, CurShp extends Shape> =
+// PLAN.md). A thunk link with a declared Op checks the threaded raw
+// value directly against `DataOf<FIn>` — the same mechanism compose.ts's
+// own entry param already uses (0 marginal cost vs ShapeOf-derive-then-
+// MatchShape's 71/site; see HANDOFF.md Finding 3/4). No ShapeOf call
+// anywhere in Step: nothing is derived from the carried value, it's just
+// threaded and structurally checked. This also fixes the k/i kind-tagging
+// bug (Finding 2): a uniform Record now satisfies a mixed-tagged In like
+// stringifyValues's, because DataOf<FIn> checks structure, not a derived
+// leaf/mixed tag.
+type Step<F, Cur> =
   IsThunk<F> extends true
     ? F extends Op<infer FIn, infer FOut, infer FArgs>
       ? FArgs extends []
-        ? MatchShape<FIn, CurShp> extends true
-          ? { ok: true; r: Raw<FOut>; shp: FOut; l: Op<FIn, FOut, []> }
+        ? Cur extends DataOf<FIn>
+          ? { ok: true; r: Raw<FOut>; l: Op<FIn, FOut, []> }
           : { ok: false }
         : { ok: false }
       : F extends () => (data: any) => infer R
-        ? { ok: true; r: R; shp: ShapeOf<R>; l: F }
+        ? { ok: true; r: R; l: F }
         : { ok: false }
     : F extends (arg: Cur) => infer R
-      ? { ok: true; r: R; shp: ShapeOf<R>; l: (arg: Cur) => R }
+      ? { ok: true; r: R; l: (arg: Cur) => R }
       : { ok: false };
 
 // Concretely typed links; exported for reuse by assemble.ts's fluent
-// .pipe()/.compose(). Threads the value (Cur) alongside its proven shape
-// (CurShp). Non-tuple (spread) chains keep each link's own signature —
-// length is unknown so per-link threading is impossible; spreads are
-// unchecked by design (see compose.test.ts), same as ComposeChain's
-// non-tuple arm.
-export type Tail<Fns extends readonly unknown[], Cur, CurShp extends Shape> =
+// .pipe()/.compose(). Threads the raw value (Cur) only — no separate
+// proven-shape channel, per the redesign (see Step). Non-tuple (spread)
+// chains keep each link's own signature — length is unknown so per-link
+// threading is impossible; spreads are unchecked by design (see
+// compose.test.ts), same as ComposeChain's non-tuple arm.
+export type Tail<Fns extends readonly unknown[], Cur> =
   IsTuple<Fns> extends true
     ? Fns extends [infer F, ...infer Rest]
-      ? Step<F, Cur, CurShp> extends {
+      ? Step<F, Cur> extends {
           ok: true;
           r: infer R;
-          shp: infer RShp extends Shape;
           l: infer L;
         }
         ? Rest extends []
           ? [L]
-          : [L, ...Tail<Rest, R, RShp>]
+          : [L, ...Tail<Rest, R>]
         : never
       : []
     : Fns extends Array<infer F>
@@ -121,17 +118,17 @@ export type ComposeChain<Fns extends readonly unknown[]> =
       ? IsThunk<F> extends true
         ? F extends Op<infer FIn, infer FOut, infer FArgs>
           ? FArgs extends []
-            ? [Op<FIn, FOut, []>, ...Tail<Rest, Raw<FOut>, FOut>]
+            ? [Op<FIn, FOut, []>, ...Tail<Rest, Raw<FOut>>]
             : never
           : F extends () => (data: infer A) => infer R
             ? Rest extends []
               ? [() => (data: A) => R]
-              : [() => (data: A) => R, ...Tail<Rest, R, ShapeOf<R>>]
+              : [() => (data: A) => R, ...Tail<Rest, R>]
             : never
         : F extends (arg: infer A) => infer R
           ? Rest extends []
             ? [(arg: A) => R]
-            : [(arg: A) => R, ...Tail<Rest, R, ShapeOf<R>>]
+            : [(arg: A) => R, ...Tail<Rest, R>]
           : never
       : never
     : Fns extends Array<infer F>
