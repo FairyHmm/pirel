@@ -91,6 +91,37 @@ function wrapBreakdown(t: Topic): Scenario[] {
   ];
 }
 
+// Shared-Deferred-surface breakdown: PLAN.md's "shared ops identity"
+// question, unblocked by the Deferred<Out,Ops> call-signature fix
+// (BUGS.md — Ops no longer dropped on invocation). Isolates whether
+// .extend() once + N downstream .op() calls (never re-calling .extend())
+// is free, vs still paying a per-call-site Fluent cost. Contrast with
+// `${name}-call` above: that scenario re-runs pirell(data).extend({...})
+// fresh at every site (the known ~36/site fresh-literal-Ops cost);
+// this one hoists ONE `pirell().extend({...})` outside the loop and
+// only sweeps the downstream .op() call sites — the actual common
+// "pre-wired export" usage shape from BUGS.md, not a synthetic stand-in.
+// `emit(0, ...)` includes the shared declaration; every other i reuses
+// the same identifier, so only i===0's line changes the file's *shape*
+// — the loop still emits N distinct lines (one per data(i)) so tsc sees
+// N real call sites, not N copies of the same expression.
+function sharedDeferredBreakdown(t: Topic): Scenario {
+  const { name, data, links } = t;
+  const op = links[0];
+  return {
+    name: `${name}-shared`,
+    summary: `pirell().extend({...}) ONCE, then N downstream .op() calls (no re-extend).`,
+    emit: (i) => {
+      const decl =
+        i === 0 ? `const shared = pirell().extend({ ${op} });\n` : "";
+      return `${decl}const s${i} = shared(${data(i)}).${op}();`;
+    },
+    defaultLen: 1,
+    sweepLen: false,
+    sweepPerChain: false,
+  };
+}
+
 // Stable-type demo: named interface Row (not inline literal). Tests
 // whether the per-site freshness floor (75/site for fresh object
 // literals) is reachable via usage-side type stability — no core
@@ -134,6 +165,15 @@ const SCENARIOS: Scenario[] = [
   ...topicScenarios({
     name: "single",
     data: () => "[1,2,3]",
+    links: ["double"],
+  }),
+  // Shared-Deferred-call: PLAN.md "shared ops identity", unblocked by
+  // the Deferred<Out,Ops> fix. Distinct data(i) per site (unlike
+  // single's fixed [1,2,3]) so each invocation is a genuinely separate
+  // call site — only the .extend() is shared/hoisted.
+  sharedDeferredBreakdown({
+    name: "single",
+    data: (i) => `[1,2,${i}]`,
     links: ["double"],
   }),
   // Wrap breakdown for obj (uniform object, one op): shows how the

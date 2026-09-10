@@ -40,6 +40,25 @@ describe("Wrapper.extend (data-bound)", () => {
 
     expect(result.value).toEqual([1, 2]);
   });
+
+  // Perf finding (PLAN.md "shared ops identity"): .extend()'s per-site
+  // type cost (~36/site, HANDOFF Finding 5) comes from Ops being
+  // inferred as a FRESH anonymous type at each call site's object
+  // literal, not from genericity itself — a shared `const` reference
+  // passed to multiple .extend() calls collapses to ~0/site marginal
+  // (verified: perf/scratch-final.mts). This test guards the runtime
+  // and narrowing behavior stay correct under that pattern.
+  it("a shared, reused ops object behaves identically to a fresh literal per call", () => {
+    const stdOps = { double, sumAll };
+    const a = pirell([1, 2, 3]).extend(stdOps).double();
+    const b = pirell([4, 5, 6]).extend(stdOps).double();
+
+    expect(a.value).toEqual([2, 4, 6]);
+    expect(b.value).toEqual([8, 10, 12]);
+    // Siblings still wired and re-checked fresh off the shared object,
+    // same as the fresh-literal path.
+    expectTypeOf(a.sumAll).not.toBeNever();
+  });
 });
 
 describe("Wrapper.extend always wires; the mismatch surfaces at the call, not registration", () => {

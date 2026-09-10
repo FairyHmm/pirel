@@ -99,6 +99,21 @@ export interface Bound<S extends Shape> {
 // A Deferred is a lazy raw-JSON transform: calling it runs the pipeline
 // on opaque input and returns a data-bound surface of shape Out. value is
 // typed undefined (matching assemble.ts) since no data is bound yet.
+//
+// Deliberately bare — no Ops param, call sig returns plain Bound<Out>.
+// PLAN.md "Deferred<Out,Ops> cost": the rich, Ops-aware call signature
+// (Assembled<Bound<Out>> & {[P in keyof Ops]: Fluent<...>}) previously
+// lived HERE, on the interface itself, costing ~2,354 instantiations to
+// merely declare — paid at every reference to the type regardless of
+// whether Ops had any keys yet. Investigated whether the original
+// Ops-drop bug (BUGS.md: "pre-wired export" gap) required Ops on this
+// interface specifically: it doesn't. Reassembled/ReOpped
+// (types/assembled.ts) are the only places that ever construct a
+// Deferred with real Ops — .extend()'s return type — so the rich shape
+// now lives solely there, applied on top of this bare interface via
+// intersection, not baked into the generic declaration every caller pays
+// for. buildDeferred's invoke (builders.ts: `buildBound(..., ops)`) is
+// runtime-only and unaffected — this is a type-level-only change.
 export interface Deferred<Out extends Shape> {
   (data: unknown): Bound<Out>;
   readonly value: undefined;
