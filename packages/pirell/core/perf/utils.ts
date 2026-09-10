@@ -1,7 +1,3 @@
-// Shared probe infrastructure: flag parsing, tsc measurement, table
-// formatting. Used by count.mts (call-site count) and
-// length.mts (chain length sweep).
-
 import { parseFlags } from "./args.js";
 import { countCell, fmt, renderTable } from "./report.js";
 import { assertTsc, cleanup, compile, tscVersion } from "./tsc.js";
@@ -103,9 +99,6 @@ export function measure(fileContent: string): Measurement {
   };
 }
 
-// Live-Type footprint marginal: total Type objects retained per unit
-// (same steady-state methodology as inst marginals — the stock to
-// instantiations' flow; proxies IDE/checker memory per call site).
 export function typesMarginal(
   typeDeltas: number[],
   units: number[],
@@ -130,9 +123,6 @@ export function countsHead(counts: number[]): string[] {
   ];
 }
 
-// Stability (tsc 7): marginals are the signal — totals repeat back-to-back
-// byte-identically. Colds wobble ±300 with load/tree churn: quiet machine,
-// no create/delete between A/B, ignore cold deltas under a few hundred.
 export function countsRow(
   name: string,
   deltas: number[],
@@ -168,7 +158,6 @@ export function lengthsHead(lengths: number[], calls: number): string[] {
   ];
 }
 
-// Length slopes are concave — pass ≥3 lengths, read the last interval.
 export function lengthsRow(
   name: string,
   deltas: number[],

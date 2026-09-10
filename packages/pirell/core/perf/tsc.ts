@@ -1,6 +1,4 @@
-// tsc compile seam: writes the stress file, runs tsc against the probe
-// config, returns stdout/stderr. Used by count.mts/length.mts (which
-// parse diagnostics) and errsize.mts (which measures mismatch verbosity).
+// tsc compile seam for count/length (parsed counts) + errsize (verbosity).
 // `perf/**` is publish-excluded.
 
 import { execFileSync } from "node:child_process";
@@ -25,10 +23,8 @@ export function tscVersion(): string {
   }).trim();
 }
 
-/** Write fileContent to the stress file and run tsc against the probe
- * config. Returns stdout (or stdout+stderr when the compile fails) so
- * callers get diagnostics text — count.mts/length.mts parse counts from
- * errsize.mts measures mismatch verbosity. */
+/** Write fileContent to the stress file, run tsc on the probe config,
+ * return stdout (or stdout+stderr when tsc exits non-zero on errors). */
 export function compile(fileContent: string, extraArgs: string[] = []): string {
   writeFileSync(tmpFile, fileContent);
   let stdout: string;

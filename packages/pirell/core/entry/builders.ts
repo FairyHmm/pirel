@@ -20,12 +20,9 @@ type SurfaceSpec = {
   composable: boolean;
 };
 
-// The whole surface stated once as a property map, installed with a
-// single defineProperties. Marker + value stay non-enumerable (as with
-// defineProperty defaults); methods are enumerable+writable (as with
-// plain assignment). Op methods forward whatever args the call site
-// gives them — shape-checking lives at the Op signature and in
-// assemble.ts's chain typing, not here.
+// One property map + single defineProperties: markers non-enumerable,
+// methods enumerable+writable. Op methods forward args untouched —
+// checking lives in Op signatures and chain typing, not here.
 function buildSurface(ops: OpMap, spec: SurfaceSpec): any {
   const target: any = spec.invoke;
   const onPipe = (...fns: Array<(x: any) => any>) => spec.onPipe(fns);
@@ -57,7 +54,6 @@ function buildSurface(ops: OpMap, spec: SurfaceSpec): any {
   return target;
 }
 
-// Data-bound surface. `value` is the current raw JSON result.
 export function buildBound(value: unknown, ops: OpMap): Assembled<Bound<any>> {
   return buildSurface(ops, {
     // Re-enter: reuse another surface's value, or bind raw data as-is.
@@ -70,7 +66,6 @@ export function buildBound(value: unknown, ops: OpMap): Assembled<Bound<any>> {
   });
 }
 
-// Lazy builder surface. `steps` accumulate until data is supplied.
 export function buildDeferred(
   steps: Array<(data: unknown) => unknown>,
   ops: OpMap,

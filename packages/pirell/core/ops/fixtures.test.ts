@@ -9,13 +9,9 @@ import {
   nth,
 } from "./fixture-ops.js";
 
-// All literals go bare — no cast. ShapeOf derives shape structurally,
-// including mixed tails and, for non-union primitive leaves, the Branch
-// itself (e.g. `[1,2,3]` derives [["i", number]], not just ["i"]) — see
-// shape-inference.md. Data has no inherent shape (ARCHITECTURE.md); an
-// `as Raw<S>` cast is a targeted escape hatch for what ShapeOf genuinely
-// can't derive (e.g. reaching past an already-erased `unknown`), not a
-// stand-in for shape inference.
+// Literals go bare (no cast): ShapeOf derives structurally, Branches
+// included. `as Raw<S>` is only for what derivation genuinely can't
+// reach (e.g. past an already-erased `unknown`).
 
 describe("type inference through chains", () => {
   it("i -> i: numbers stay numbered", () => {

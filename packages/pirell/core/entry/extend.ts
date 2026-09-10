@@ -2,23 +2,19 @@ import type { Op } from "../types/base.js";
 import type { OpMap } from "./assemble.js";
 import { valueOf } from "./surface.js";
 
-// Two calling conventions: extend(surface, ops) or extend(ops)(surface)
 export function extend<Ops extends OpMap>(surface: any, ops: Ops): any;
 export function extend<Ops extends OpMap>(ops: Ops): (surface: any) => any;
-// Args constrained to [] here: this form calls fn with zero args to reach
-// its (data) => result stage. A parameterized op (e.g. nth's [i: number])
-// would silently run with its argument missing — reject it at the type
-// level rather than let it compile and misbehave at runtime.
+// Args constrained to []: this form zero-calls fn to reach its stage —
+// a parameterized op would silently run with its argument missing, so
+// reject it at the type level instead.
 export function extend(fn: Op<any, any, []>): (x: any) => any;
 export function extend(surfaceOrOps: any, ops?: any): any {
   if (ops !== undefined) {
     return applyExtend(surfaceOrOps, ops);
   }
   if (typeof surfaceOrOps === "function") {
-    // Unwrap a surface to its raw value before calling fn; a bare value
-    // passes through. Both typeof checks matter (surfaces are callable fns).
-    // fn is a curried zero-arg Op here — call with no args to reach the
-    // (data) => result stage before applying to raw.
+    // Unwrap surfaces to raw value first (both typeof checks matter:
+    // surfaces are callable fns); zero-call fn to reach its stage.
     if (surfaceOrOps.length !== 0) {
       throw new TypeError(
         `extend(fn): fn expects ${surfaceOrOps.length} argument(s) — parameterized ops aren't supported by this form (their argument would be silently missing). Wire it via extend(surface, { name: fn }) instead, or pre-apply the argument: extend(fn(arg)).`,

@@ -1,8 +1,6 @@
-// Type-cost probe (chain length sweep): tsc instantiation deltas as the
-// chain length grows (each link applied to the same data, call sites held
-// constant). Covers both fixed-length chains (chain2, deep2) and
-// sweepable chains (chainN, sameN). `npm run perf:length -- --help`
-// for flags. `perf/**` is publish-excluded.
+// Type-cost probe (chain length sweep): deltas as chain length grows,
+// call sites held constant. Fixed chains (chain2, deep2) + sweepable
+// chains (alternating, same-op). See --help for flags.
 
 import {
   type Scenario,
@@ -23,8 +21,6 @@ import {
   parseArgs,
   renderTable,
 } from "./utils.js";
-
-// --- Chain length catalog ---
 
 interface Topic {
   name: string;
@@ -101,7 +97,6 @@ function sweepScenarios(t: SweepTopic): Scenario[] {
 }
 
 const FIXED: Scenario[] = [
-  // Two-op fixed chains.
   ...topicScenarios({
     name: "chain2",
     data: () => "[1,2,3]",
@@ -115,7 +110,6 @@ const FIXED: Scenario[] = [
 ];
 
 const SWEEP: Scenario[] = [
-  // Alternating ops, sweepable length.
   ...sweepScenarios({
     name: "alternating",
     data: (i) => `{a:1,b:2,k${i}:3}`,
@@ -138,8 +132,6 @@ function findScenario(name: string): Scenario {
   if (!found) throw new Error(`unknown scenario: ${name}`);
   return found;
 }
-
-// --- Orchestration ---
 
 function main(): void {
   const version = assertAndVersion();

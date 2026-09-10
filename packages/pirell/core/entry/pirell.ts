@@ -1,9 +1,7 @@
 import type { Dim } from "../types/base.js";
 
-// Bare data-bound surface: value only, no fluent methods, untyped (shape is
-// a compile-time claim). This is the lean entry for people who don't need
-// the assembled pirell() surface (extend/pipe/compose); that one, with its
-// type-level shape inference, lives in assemble.ts.
+// Bare data-bound surface (value only, no methods, untyped): the lean
+// entry for callers who don't need assemble.ts's shape-inferring surface.
 export class Wrapper<S> {
   constructor(public readonly value: unknown) {
     // Mirror pirell(undefined): a Wrapper must never hold undefined.

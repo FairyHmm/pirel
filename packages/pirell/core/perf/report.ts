@@ -3,12 +3,9 @@
 
 export const fmt = (n: number): string => n.toLocaleString("en-US");
 
-// Tables render constant-width: callers collect head + all rows first,
-// then renderTable pads every column to its widest cell, so pasted output
-// stays aligned without manual cleanup. A cell may hold two parts joined
-// by "\t" (count cells do: "1,897\t(80ms)"): the left part aligns left,
-// the right part aligns right, so inst counts form one flush edge and
-// times form another within the same column.
+// Constant-width tables: callers collect head + rows first, then every
+// column pads to its widest cell. A "\t" cell splits left-align /
+// right-align (counts flush one edge, times the other).
 export function renderTable(head: string[], rows: string[][]): string {
   const split = (c: string): [string, string] => {
     const i = c.indexOf("\t");
@@ -33,6 +30,5 @@ export function renderTable(head: string[], rows: string[][]): string {
   return [line(head), divider, ...rows.map(line)].join("\n");
 }
 
-// One count cell: inst count (aligns left) + check time in ms (aligns right).
 export const countCell = (inst: number, checkSecs: number): string =>
   `${fmt(inst)}\t ${Math.round(checkSecs * 1000)}ms`;

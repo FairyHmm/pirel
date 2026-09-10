@@ -1,7 +1,5 @@
-// pirell() runtime entry point. Surface types (Assembled<S>, Fluent<F,S>,
-// etc.) live in types/assembled.ts and types/fluent.ts — this file is
-// just the two-overload function and its re-exports for callers who
-// import surface types from here (backward-compatible import path).
+// pirell() runtime entry + re-exports (surface types live in types/;
+// re-exported here as the backward-compatible import path).
 
 import { buildDeferred, buildBound } from "./builders.js";
 import type { Bound, Deferred } from "../types/base.js";

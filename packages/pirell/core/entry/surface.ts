@@ -1,9 +1,6 @@
-// Single definition of "what is a Pirell surface" and how to unwrap it.
-// assemble.ts identifies surfaces to bind/reuse their value; extend.ts's
-// single-op form unwraps a surface before calling fn. Both must agree, or
-// a user-facing call like extend(fn)(pirell(data)) would diverge from the
-// internal surface handling.
-
+// Single definition of surface identity + unwrap. assemble.ts and
+// extend.ts must agree here, or user-facing and internal handling of
+// extend(fn)(pirell(data)) diverge.
 export const SURFACE = "__pirell";
 
 export const isSurface = (x: unknown): boolean =>

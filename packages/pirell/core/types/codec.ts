@@ -9,9 +9,8 @@ import type {
   Variants,
 } from "./base.js";
 
-// Bidirectional Shape mapping. The two directions are inverses — same
-// ladder, opposite ways — so they live side by side: forwards
-// (Shape → type) first, backwards (type → Shape) second.
+// Bidirectional Shape mapping, side by side: forwards (Shape → type)
+// first, backwards (type → Shape) second.
 
 // --- Shape → type ---
 
@@ -26,13 +25,8 @@ export type DataOf<S extends Shape> = S extends []
       ? DataOfElem<Head, Rest>
       : unknown;
 
-// Rest only matters when Head is a bare Dim/MixedTag (no Branch payload);
-// then Rest is itself the nested Shape for the container's contents.
-// Container constructor by dim — states the i→array / k→record mapping
-// once instead of re-spelling it in every arm below. Only ever indexed
-// by an already-narrowed Dim (a deferred table lookup can't satisfy the
-// constraint — TS won't see through it). (No empty-Rest special case
-// needed: DataOf<[]> is unknown, so Rest=[] falls out directly.)
+// Dim→container mapping, stated once. Indexed only by narrowed Dim
+// (TS can't see through a deferred lookup).
 type Container<D extends Dim, V> = { i: V[]; k: Record<string, V> }[D];
 
 // Bare mixed tags carry no payload — fixed result per tag, read off a
@@ -68,14 +62,13 @@ export type IsUnion<T, U = T> = T extends U
     : true
   : never;
 
-// Narrows _ShapeOf's result for callers. A union element type is
-// heterogeneous by construction → "i..."/"k...".
+// Single-evaluates _ShapeOf via infer R (re-spelling it cost ~2.5x)
+// and narrows the result to Shape.
 export type ShapeOf<D> = _ShapeOf<D> extends infer R extends Shape ? R : never;
 
-// Index-signature objects vacuously match `Raw<infer S>` (an optional
-// symbol key conflicts with nothing), inferring S as the whole Shape
-// union — so they're excluded before the Raw check, not by changing Raw
-// (which would break `as Raw<S>` casts in op authoring).
+// Index-signature objects vacuously match Raw's optional brand, inferring
+// a bogus S — excluded before the Raw check. (Not fixed in Raw itself:
+// that would break `as Raw<S>` casts in op authoring.)
 
 // Concrete enough to encode as a Branch: not unknown/any, not a union
 // (those go mixed), not a container (those recurse). Lets `[1,2,3]`
@@ -90,16 +83,9 @@ type IsConcreteLeaf<E> = [unknown] extends [E]
         ? false
         : true;
 
-// Only trust the Raw brand when S is a concrete non-empty tuple (a real
-// brand can only exist then: Raw<[]>/Raw<["..."]> collapse to unknown).
-// Otherwise structural derivation, which round-trips bare literals.
-// Brand-presence gate: the Raw<S> inference runs only when D carries the
-// brand symbol. Unbranded (fresh-literal) inputs skip it — the inference
-// can never yield a usable S there (no brand to infer from; a brand-less
-// structural match infers S ~ unknown, fails the tuple check, and falls
-// to ShapeOfElem anyway), so the gate preserves semantics exactly while
-// skipping ~2/3 of the per-site shape cost (probe: ShapeOf 58/site vs
-// ShapeOfElem 19/site).
+// Raw<S> inference runs only when D carries the brand (unbranded inputs
+// can never yield a usable S) — skips ~2/3 of per-site shape cost. The
+// tuple check trusts only concrete non-empty brands.
 type _ShapeOf<D> =
   string extends keyof D
     ? ShapeOfElem<D>
@@ -111,17 +97,14 @@ type _ShapeOf<D> =
         : ShapeOfElem<D>
       : ShapeOfElem<D>;
 
-// Inverse of DataOfElem above: same ladder, opposite direction —
-// derives a container value's Elem-list where DataOfElem encodes one.
 type ShapeOfElem<D> = D extends readonly (infer E)[]
   ? IsUnion<E> extends true
     ? ["i..."]
     : IsConcreteLeaf<E> extends true
       ? [["i", E]]
       : ["i", ...ContainerTail<E>]
-  // Uniform-first: concrete-leaf check before the union check, so
-  // uniform objects (the common case) skip IsUnion entirely. Mixed
-  // objects pay both checks — prioritising uniform over mixed.
+  // Uniform-first: concrete-leaf before union, so the common case
+  // skips IsUnion entirely.
   : D extends object
     ? IsConcreteLeaf<D[keyof D]> extends true
       ? [["k", D[keyof D]]]
@@ -130,7 +113,6 @@ type ShapeOfElem<D> = D extends readonly (infer E)[]
         : ["k", ...ContainerTail<D[keyof D]>]
     : [];
 
-// Leaves stop at []; containers recurse one level.
 type ContainerTail<E> = [unknown] extends [E]
   ? []
   : E extends readonly unknown[]

@@ -1,6 +1,5 @@
-// Type-cost probe (call-site count): tsc instantiation deltas as the
-// number of distinct call sites grows. One op per topic, distinct data
-// types per site — pure per-site cost. `npm run perf:count -- --help`
+// Type-cost probe (call-site count): tsc instantiation deltas as distinct
+// call sites grow. One op per topic — pure per-site cost. See --help
 // for flags. `perf/**` is publish-excluded.
 
 import {
@@ -20,8 +19,6 @@ import {
   parseArgs,
   renderTable,
 } from "./utils.js";
-
-// --- Call-site count catalog (single op, distinct data per site) ---
 
 interface Topic {
   name: string;
@@ -91,20 +88,9 @@ function wrapBreakdown(t: Topic): Scenario[] {
   ];
 }
 
-// Shared-Deferred-surface breakdown: PLAN.md's "shared ops identity"
-// question, unblocked by the Deferred<Out,Ops> call-signature fix
-// (BUGS.md — Ops no longer dropped on invocation). Isolates whether
-// .extend() once + N downstream .op() calls (never re-calling .extend())
-// is free, vs still paying a per-call-site Fluent cost. Contrast with
-// `${name}-call` above: that scenario re-runs pirell(data).extend({...})
-// fresh at every site (the known ~36/site fresh-literal-Ops cost);
-// this one hoists ONE `pirell().extend({...})` outside the loop and
-// only sweeps the downstream .op() call sites — the actual common
-// "pre-wired export" usage shape from BUGS.md, not a synthetic stand-in.
-// `emit(0, ...)` includes the shared declaration; every other i reuses
-// the same identifier, so only i===0's line changes the file's *shape*
-// — the loop still emits N distinct lines (one per data(i)) so tsc sees
-// N real call sites, not N copies of the same expression.
+// Shared-Deferred breakdown: .extend() ONCE, then N downstream .op()
+// calls — isolates per-call cost from per-site pirell+extend. Only
+// i===0 changes the file's shape (still N real call sites).
 function sharedDeferredBreakdown(t: Topic): Scenario {
   const { name, data, links } = t;
   const op = links[0];
@@ -122,10 +108,8 @@ function sharedDeferredBreakdown(t: Topic): Scenario {
   };
 }
 
-// Stable-type demo: named interface Row (not inline literal). Tests
-// whether the per-site freshness floor (75/site for fresh object
-// literals) is reachable via usage-side type stability — no core
-// change needed.
+// Stable-type demo: named interface Row, not inline literal — whether
+// usage-side stability reaches the freshness floor with no core change.
 const STABLE_PREFIX = "interface Row { a: number; k: number; }";
 
 const stableBreakdown: Scenario[] = [
@@ -154,9 +138,6 @@ const stableBreakdown: Scenario[] = [
 ];
 
 const SCENARIOS: Scenario[] = [
-  // Wrap breakdown for single (array, one op): isolates pirell-only,
-  // pirell+extend, pirell+extend+call. Shows how the 36/site wrap
-  // marginal distributes across the surface lifecycle.
   ...wrapBreakdown({
     name: "single",
     data: () => "[1,2,3]",
@@ -167,19 +148,13 @@ const SCENARIOS: Scenario[] = [
     data: () => "[1,2,3]",
     links: ["double"],
   }),
-  // Shared-Deferred-call: PLAN.md "shared ops identity", unblocked by
-  // the Deferred<Out,Ops> fix. Distinct data(i) per site (unlike
-  // single's fixed [1,2,3]) so each invocation is a genuinely separate
-  // call site — only the .extend() is shared/hoisted.
+  // Shared-Deferred-call: .extend() hoisted, distinct data(i) per site —
+  // each invocation a genuine call site, only extension shared.
   sharedDeferredBreakdown({
     name: "single",
     data: (i) => `[1,2,${i}]`,
     links: ["double"],
   }),
-  // Wrap breakdown for obj (uniform object, one op): shows how the
-  // 111/site obj-wrap marginal distributes. Compare with single's
-  // breakdown to see where the ~75 fresh-object-literal cost lives
-  // (pirell? extend? call?).
   ...wrapBreakdown({
     name: "obj",
     data: (i) => `{a:1,k${i}:2}`,
@@ -190,17 +165,13 @@ const SCENARIOS: Scenario[] = [
     data: (i) => `{a:1,k${i}:2}`,
     links: ["toEntries"],
   }),
-  // 3-key uniform object → toEntries: matches mixed1's key count (3)
-  // to separate key-count effect from mixed-values effect when comparing
-  // obj-vs-mixed1. Same op as obj, only key count differs.
+  // 3-key uniform control: separates key-count effect from
+  // mixed-values effect vs mixed1.
   ...topicScenarios({
     name: "obj3-u",
     data: (i) => `{a:1,b:2,k${i}:3}`,
     links: ["toEntries"],
   }),
-  // Wrap breakdown for mixed1 (mixed object, one op): shows how the
-  // 89/site mixed1-wrap marginal distributes. Mixed is cheaper than
-  // uniform because bare ["k..."] has no Branch payload to construct.
   ...wrapBreakdown({
     name: "mixed1",
     data: (i) => `{a:1,b:"x",k${i}:true}`,
@@ -211,10 +182,7 @@ const SCENARIOS: Scenario[] = [
     data: (i) => `{a:1,b:"x",k${i}:true}`,
     links: ["stringifyValues"],
   }),
-  // Stable-type demo: named interface Row (not inline literal). Tests
-  // whether the per-site freshness floor (75/site for fresh object
-  // literals) is reachable via usage-side type stability — no core
-  // change needed.
+  // Stable-type demo: usage-side reachability of the freshness floor.
   ...stableBreakdown,
 ];
 
@@ -223,8 +191,6 @@ function findScenario(name: string): Scenario {
   if (!found) throw new Error(`unknown scenario: ${name}`);
   return found;
 }
-
-// --- Orchestration ---
 
 function main(): void {
   const version = assertAndVersion();

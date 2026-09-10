@@ -1,7 +1,5 @@
-// Shared flag parsing for the perf tools (probe, bench). The mechanics
-// live here exactly once: `--` pass-through separator (pnpm/npm),
-// `--flag value` and `--flag=value`, boolean flags, and `-h/--help`
-// via a per-tool usage text.
+// Shared flag parsing for the perf tools. Mechanics live here once:
+// `--` separator, `--flag value`/`=value`, booleans, `-h/--help`.
 
 export interface FlagSpec {
   withValue: readonly string[];

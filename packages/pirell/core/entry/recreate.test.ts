@@ -5,10 +5,8 @@ import { describe, it, expect } from "vitest";
 import type { Op } from "../index.js";
 import { extend, pirell } from "../index.js";
 
-// Op is always curried; the body is the curried form directly, shapes come
-// from the Op<...> annotation. The `as unknown as Op<...>` cast supplies the
-// required __pirell discriminant (BUGS.md #12), type-level only. groupBy
-// partitions an indexed collection of keyed rows (['i','k',...]).
+// Bodies are plain curried fns; the as-cast supplies the Op<...> shapes.
+// groupBy partitions keyed rows.
 const groupBy = ((key: string) => (data: unknown) => {
   const rows = data as Record<string, unknown>[];
   const groups: Record<string, Record<string, unknown>[]> = Object.create(null);

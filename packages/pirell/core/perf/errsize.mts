@@ -1,13 +1,5 @@
-// Error-verbosity probe: how loud is the standard mismatch? Compiles a
-// fixed wrap mismatch (array data → toEntries) and reports the tsc
-// output size for it — the DX complement to instantiation counts
-// (serves the BUGS.md mismatch-propagation nit with a number, not vibes).
-// Run: `npm run perf:errsize`. Same machine for A/B; paths make absolutes
-// machine-specific, so compare deltas, not raw chars.
-//
-// Reuses the probe scaffold: tsc invocation + stress file live in
-// tsc.ts (compile/assertTsc/tmpFile), this file only crafts the file
-// content and measures the error block.
+// Error-verbosity probe: tsc output size for the standard mismatch.
+// Deltas only — absolutes are machine-specific (paths).
 
 import { basename } from "node:path";
 import { assertTsc, cleanup, compile, tmpFile } from "./tsc.js";

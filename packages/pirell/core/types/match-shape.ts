@@ -1,16 +1,8 @@
 import type { Elem, ElemCase, Shape } from "./base.js";
 
-// Shape-vs-Shape matching. Independent of any wiring pattern.
-
-// Single-direction: Actual must extend In. Elem is closed — a new arm must
-// not classify to a subtype of an existing one. Both sides go through the
-// canonical ElemCase; the continuation branches off its fields. A bare InE
-// (branch and variants both never) claims only dim+kind, so any
-// same-dim+kind ActualE satisfies it; a declared InE compares its payload
-// arm (branch xor variants — never-guarded both sides, since bare never
-// matches everything). Indexed access (not extends-destructure) re-references
-// ElemCase<InE>/ElemCase<ActualE> through tsc's per-argument alias cache
-// instead of re-running a pattern match to bind each field.
+// Single-direction: Actual must extend In. Bare InE claims only dim+kind;
+// declared InE compares its payload arm. Elem is closed — new arms must
+// not subtype existing ones.
 type MatchElem<InE extends Elem, ActualE extends Elem> =
   ElemCase<ActualE>["dim"] extends ElemCase<InE>["dim"]
     ? ElemCase<ActualE>["kind"] extends ElemCase<InE>["kind"]

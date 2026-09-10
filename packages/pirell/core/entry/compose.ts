@@ -6,10 +6,8 @@ import type {
 import type { DataOf } from "../types/codec.js";
 import { makeFlat } from "../ops/ops.js";
 
-// Untyped runtime shared by the typed compose wrapper below and the
-// surface builders (which thread untyped step arrays, not Fns tuples).
-// The stage-invoke + stage-error contract lives here, in exactly one
-// place — builders call this directly instead of re-casting compose.
+// Untyped runtime shared by typed compose below and the surface builders.
+// Stage-invoke + stage-error contract lives here exactly once.
 export function composeRaw(...fns: Array<(x: any) => any>): (x: any) => any {
   // A zero-arg Op arrives curried — one extra call yields the (data) => R
   // stage; a bare fn is already that stage.
@@ -45,10 +43,8 @@ export function compose(...fns: Array<(x: any) => any>): (x: any) => any {
   return composeRaw(...fns);
 }
 
-// Data-first view of compose. makeFlat is a shape-agnostic form converter,
-// so `makeFlat(compose)` carries no claim — the entry claim is authored
-// here, at compose/pipe's own site (not in makeFlat). Same
-// ComposeChain/ComposeResult compose uses, flipped to (data, ...fns).
+// Data-first view of compose. The entry claim is authored here, not in
+// shape-agnostic makeFlat — same Chain/Result types, flipped argument order.
 type PipeFn = <Fns extends unknown[]>(
   data: DataOf<FirstIn<Fns>>,
   ...fns: Fns & ComposeChain<Fns>

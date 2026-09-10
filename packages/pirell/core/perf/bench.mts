@@ -1,21 +1,5 @@
-// Runtime throughput bench (mirrors the type-probe topics, end to end to
-// raw JSON). Measures what users feel: wall time per call for the three
-// forms.
-//
-// Methodology (bench hygiene — read before quoting numbers):
-// - Adaptive iterations: each case is calibrated to ~250ms/run, so slow
-//   and fast cases cost the same wall time (fixed counts either take
-//   forever or measure nothing).
-// - MINIMUM across runs is the primary number: GC/JIT pauses only ever
-//   add time, so min ≈ pause-free steady state; median shown for spread.
-// - Only deltas >25% absolute (>15% ratio) are actionable. Last-digit
-//   wobble (OS/JIT/GC on a dev machine) is inherent — re-run back-to-back
-//   or isolate (`--case` in a fresh process) on dispute; interleave A/B
-//   runs for close calls.
-// - `npm run perf:bench` = lean default (~15s, one process); `--all` = full
-//   matrix; `--case <name>` = one case (scorecard A/B loop documented
-//   in git history — fresh `npx tsx` per case + NODE_OPTIONS=--expose-gc).
-//   Both flags accept `=` form; flag parsing is shared (perf/args.ts).
+// Runtime bench: wall time per call for the three forms (what users
+// feel). Min-across-runs primary (pauses only ever add).
 
 import { pipe } from "../entry/compose.js";
 import { pirell } from "../entry/assemble.js";
@@ -170,10 +154,8 @@ console.log(
     rows,
   ),
 );
-// Ratios cancel machine-speed drift (both sides slow down together), so
-// they read steadier across sessions than absolutes. Pipe (not direct)
-// is the reference: direct sits at the timer floor (~0.0), which would
-// make ratios meaningless. Meaningful only when the reference cases ran.
+// Ratios cancel machine drift. Pipe is the reference (direct sits at
+// the timer floor). Meaningful only when the reference cases ran.
 const ratio = (a?: number, b?: number): string =>
   a !== undefined && b !== undefined && b > 0 ? `${(a / b).toFixed(0)}×` : "—";
 if (!only)

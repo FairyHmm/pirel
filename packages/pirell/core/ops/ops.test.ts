@@ -9,10 +9,8 @@ import {
   sumValues,
 } from "./fixture-ops.js";
 
-// makeFlat/makeCurry are general flat↔curried form converters, not op
-// factories and not chain-aware — they flip a calling convention with no
-// shape/Op/chain knowledge. These tests exercise them with plain functions
-// (and with a plain pipe/compose-shaped fn) to pin that contract.
+// makeFlat/makeCurry flip calling convention with no shape knowledge —
+// tested with plain fns to pin that contract.
 
 describe("makeCurry: flat (data, ...args) => result → curried", () => {
   it("curries a plain function, threading args then data", () => {
